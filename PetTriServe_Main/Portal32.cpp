@@ -17,6 +17,8 @@ const char INDEX_HTML[] PROGMEM = R"=====(
         .form-group { margin-bottom: 1.2rem; }
         label { display: block; font-size: 14px; color: var(--secondary); margin-bottom: 0.4rem; }
         input, select { width: 100%; padding: 12px; border: 1px solid #d2d2d7; border-radius: 8px; font-size: 16px; box-sizing: border-box; outline: none; transition: border-color 0.2s; }
+        .form-group input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        .form-group input.time-part { width: 48%; text-align: center; }
         input:focus { border-color: var(--primary); }
         .btn { width: 100%; padding: 14px; background: var(--primary); color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 500; cursor: pointer; margin-top: 1rem; }
         .btn:disabled { background: #b1b1b1; }
@@ -56,19 +58,40 @@ const char INDEX_HTML[] PROGMEM = R"=====(
         <div class="info-card">
             <strong>Feeder 1</strong>
             <div class="form-group"><label>Start Time</label><input type="time" id="f1_start"></div>
-            <div class="form-group"><label>Interval (HH:MM)</label><input type="time" id="f1_int"></div>
+            <div class="form-group"><label>Interval (Hrs : Min)</label>
+                <div style="display:flex; align-items:center; gap:5px;">
+                    <input type="number" id="f1_int_h" placeholder="HH" min="0" max="23" class="time-part">
+                    <span>:</span>
+                    <input type="number" id="f1_int_m" placeholder="MM" min="0" max="59" class="time-part">
+                </div>
+            </div>
+            <div class="form-group"><label>Duration (Seconds)</label><input type="number" id="f1_dur" min="1" max="60" value="5"></div>
         </div>
         
         <div class="info-card">
             <strong>Feeder 2</strong>
             <div class="form-group"><label>Start Time</label><input type="time" id="f2_start"></div>
-            <div class="form-group"><label>Interval (HH:MM)</label><input type="time" id="f2_int"></div>
+            <div class="form-group"><label>Interval (Hrs : Min)</label>
+                <div style="display:flex; align-items:center; gap:5px;">
+                    <input type="number" id="f2_int_h" placeholder="HH" min="0" max="23" class="time-part">
+                    <span>:</span>
+                    <input type="number" id="f2_int_m" placeholder="MM" min="0" max="59" class="time-part">
+                </div>
+            </div>
+            <div class="form-group"><label>Duration (Seconds)</label><input type="number" id="f2_dur" min="1" max="60" value="5"></div>
         </div>
 
         <div class="info-card">
             <strong>Feeder 3</strong>
             <div class="form-group"><label>Start Time</label><input type="time" id="f3_start"></div>
-            <div class="form-group"><label>Interval (HH:MM)</label><input type="time" id="f3_int"></div>
+            <div class="form-group"><label>Interval (Hrs : Min)</label>
+                <div style="display:flex; align-items:center; gap:5px;">
+                    <input type="number" id="f3_int_h" placeholder="HH" min="0" max="23" class="time-part">
+                    <span>:</span>
+                    <input type="number" id="f3_int_m" placeholder="MM" min="0" max="59" class="time-part">
+                </div>
+            </div>
+            <div class="form-group"><label>Duration (Seconds)</label><input type="number" id="f3_dur" min="1" max="60" value="5"></div>
         </div>
         
         <button class="btn" id="saveBtn" onclick="saveConfig()">Save & Connect</button>
@@ -96,11 +119,22 @@ const char INDEX_HTML[] PROGMEM = R"=====(
             const name = document.getElementById('name').value;
             
             const f1_start = document.getElementById('f1_start').value;
-            const f1_int = document.getElementById('f1_int').value;
+            const f1_int_h = document.getElementById('f1_int_h').value.padStart(2, '0');
+            const f1_int_m = document.getElementById('f1_int_m').value.padStart(2, '0');
+            const f1_int = `${f1_int_h}:${f1_int_m}`;
+            const f1_dur = document.getElementById('f1_dur').value;
+            
             const f2_start = document.getElementById('f2_start').value;
-            const f2_int = document.getElementById('f2_int').value;
+            const f2_int_h = document.getElementById('f2_int_h').value.padStart(2, '0');
+            const f2_int_m = document.getElementById('f2_int_m').value.padStart(2, '0');
+            const f2_int = `${f2_int_h}:${f2_int_m}`;
+            const f2_dur = document.getElementById('f2_dur').value;
+            
             const f3_start = document.getElementById('f3_start').value;
-            const f3_int = document.getElementById('f3_int').value;
+            const f3_int_h = document.getElementById('f3_int_h').value.padStart(2, '0');
+            const f3_int_m = document.getElementById('f3_int_m').value.padStart(2, '0');
+            const f3_int = `${f3_int_h}:${f3_int_m}`;
+            const f3_dur = document.getElementById('f3_dur').value;
 
             const status = document.getElementById('status');
             const btn = document.getElementById('saveBtn');
@@ -110,9 +144,9 @@ const char INDEX_HTML[] PROGMEM = R"=====(
                 const formData = new URLSearchParams();
                 formData.append('ssid', ssid); formData.append('password', pass); formData.append('device_name', name);
                 
-                formData.append('f1_start', f1_start); formData.append('f1_int', f1_int);
-                formData.append('f2_start', f2_start); formData.append('f2_int', f2_int);
-                formData.append('f3_start', f3_start); formData.append('f3_int', f3_int);
+                formData.append('f1_start', f1_start); formData.append('f1_int', f1_int); formData.append('f1_dur', f1_dur);
+                formData.append('f2_start', f2_start); formData.append('f2_int', f2_int); formData.append('f2_dur', f2_dur);
+                formData.append('f3_start', f3_start); formData.append('f3_int', f3_int); formData.append('f3_dur', f3_dur);
                 
                 const res = await fetch('/save', { method: 'POST', body: formData });
                 if (res.ok) { status.textContent = "Success! Rebooting ESP32..."; status.className = "status-msg success"; } 
@@ -131,11 +165,34 @@ const char INDEX_HTML[] PROGMEM = R"=====(
                 if (data.device) document.getElementById('name').value = data.device;
                 
                 if (data.f1_start) document.getElementById('f1_start').value = data.f1_start;
-                if (data.f1_int) document.getElementById('f1_int').value = data.f1_int;
+                if (data.f1_int) {
+                    const parts = data.f1_int.split(':');
+                    if(parts.length >= 2) {
+                        document.getElementById('f1_int_h').value = parseInt(parts[0]);
+                        document.getElementById('f1_int_m').value = parseInt(parts[1]);
+                    }
+                }
+                if (data.f1_dur) document.getElementById('f1_dur').value = data.f1_dur;
+                
                 if (data.f2_start) document.getElementById('f2_start').value = data.f2_start;
-                if (data.f2_int) document.getElementById('f2_int').value = data.f2_int;
+                if (data.f2_int) {
+                    const parts = data.f2_int.split(':');
+                    if(parts.length >= 2) {
+                        document.getElementById('f2_int_h').value = parseInt(parts[0]);
+                        document.getElementById('f2_int_m').value = parseInt(parts[1]);
+                    }
+                }
+                if (data.f2_dur) document.getElementById('f2_dur').value = data.f2_dur;
+                
                 if (data.f3_start) document.getElementById('f3_start').value = data.f3_start;
-                if (data.f3_int) document.getElementById('f3_int').value = data.f3_int;
+                if (data.f3_int) {
+                    const parts = data.f3_int.split(':');
+                    if(parts.length >= 2) {
+                        document.getElementById('f3_int_h').value = parseInt(parts[0]);
+                        document.getElementById('f3_int_m').value = parseInt(parts[1]);
+                    }
+                }
+                if (data.f3_dur) document.getElementById('f3_dur').value = data.f3_dur;
             } catch (e) { console.error("Status check failed", e); }
         }
         window.onload = () => { scanWifi(); checkStatus(); setInterval(checkStatus, 5000); };
@@ -233,17 +290,25 @@ void Portal32::loadSettings() {
     feeders[0].id = 1;
     feeders[0].startTime = preferences.getString("f1_start", "08:00");
     feeders[0].interval = preferences.getString("f1_int", "04:00");
+    feeders[0].dispenseDuration = preferences.getInt("f1_dur", 5);
 
     feeders[1].id = 2;
     feeders[1].startTime = preferences.getString("f2_start", "12:00");
     feeders[1].interval = preferences.getString("f2_int", "04:00");
+    feeders[1].dispenseDuration = preferences.getInt("f2_dur", 5);
 
     feeders[2].id = 3;
     feeders[2].startTime = preferences.getString("f3_start", "18:00");
     feeders[2].interval = preferences.getString("f3_int", "04:00");
+    feeders[2].dispenseDuration = preferences.getInt("f3_dur", 5);
     
     preferences.end();
-}
+
+    Serial.printf("[PORTAL32] Loaded Settings:\n");
+    Serial.printf("  SSID: %s\n", ssid.c_str());
+    Serial.printf("  F1 Start: %s, Int: %s, Dur: %d\n", feeders[0].startTime.c_str(), feeders[0].interval.c_str(), feeders[0].dispenseDuration);
+    Serial.printf("  F2 Start: %s, Int: %s, Dur: %d\n", feeders[1].startTime.c_str(), feeders[1].interval.c_str(), feeders[1].dispenseDuration);
+    Serial.printf("  F3 Start: %s, Int: %s, Dur: %d\n", feeders[2].startTime.c_str(), feeders[2].interval.c_str(), feeders[2].dispenseDuration);}
 
 void Portal32::saveSettings(String s, String p, String n) {
     // This overload is kept for compatibility but main saving logic is in handleSave for specific fields
@@ -322,21 +387,36 @@ void Portal32::handleSave() {
     String f2_i = server.arg("f2_int");
     String f3_s = server.arg("f3_start");
     String f3_i = server.arg("f3_int");
+    
+    // Debugging
+    Serial.printf("[PORTAL32] Saving Config:\n");
+    Serial.printf("  SSID: %s\n", s.c_str());
+    Serial.printf("  Name: %s\n", n.c_str());
+    Serial.printf("  F1 Start: %s, Int: %s, Dur: %d\n", f1_s.c_str(), f1_i.c_str(), server.arg("f1_dur").toInt());
+    Serial.printf("  F2 Start: %s, Int: %s, Dur: %d\n", f2_s.c_str(), f2_i.c_str(), server.arg("f2_dur").toInt());
+    Serial.printf("  F3 Start: %s, Int: %s, Dur: %d\n", f3_s.c_str(), f3_i.c_str(), server.arg("f3_dur").toInt());
 
     if (n.length() == 0) n = "Portal32-Device";
     Serial.println("[PORTAL32] New configuration received. Saving...");
     
     preferences.begin("portal32", false);
+    
+    // Clear potentially corrupted keys by overwriting
     preferences.putString("ssid", s);
     preferences.putString("password", p);
     preferences.putString("device_name", n);
     
     preferences.putString("f1_start", f1_s);
     preferences.putString("f1_int", f1_i);
+    preferences.putInt("f1_dur", server.arg("f1_dur").toInt());
+    
     preferences.putString("f2_start", f2_s);
     preferences.putString("f2_int", f2_i);
+    preferences.putInt("f2_dur", server.arg("f2_dur").toInt());
+    
     preferences.putString("f3_start", f3_s);
     preferences.putString("f3_int", f3_i);
+    preferences.putInt("f3_dur", server.arg("f3_dur").toInt());
     preferences.end();
 
     // Reload settings to update memory

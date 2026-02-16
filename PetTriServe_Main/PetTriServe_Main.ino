@@ -130,9 +130,9 @@ void create_home_screen() {
 
     // Time Label (Large)
     time_label = lv_label_create(home_cont);
-    lv_obj_set_style_text_font(time_label, &lv_font_montserrat_34, 0);
+    lv_obj_set_style_text_font(time_label, &lv_font_montserrat_28, 0); // Reduced by ~20%
     lv_obj_set_style_text_color(time_label, lv_color_hex(0xFFFFFF), 0);
-    lv_label_set_text(time_label, "00:00");
+    lv_label_set_text(time_label, "00:00:00");
 
     // Date Label
     date_label = lv_label_create(home_cont);
@@ -165,7 +165,10 @@ void create_home_screen() {
         lv_obj_set_size(f_card, LV_PCT(100), LV_SIZE_CONTENT);
         lv_obj_set_style_bg_color(f_card, lv_color_hex(colors[i]), 0);
         lv_obj_set_style_bg_opa(f_card, 150, 0); // Slight transparency
-        lv_obj_set_style_pad_all(f_card, 5, 0);
+        lv_obj_set_style_pad_left(f_card, 5, 0);
+        lv_obj_set_style_pad_top(f_card, 5, 0);
+        lv_obj_set_style_pad_bottom(f_card, 5, 0);
+        lv_obj_set_style_pad_right(f_card, 35, 0); // Increased to move time left (~10%)
         lv_obj_set_style_radius(f_card, 5, 0);
         lv_obj_set_flex_flow(f_card, LV_FLEX_FLOW_ROW);
         lv_obj_set_flex_align(f_card, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -195,18 +198,28 @@ void create_home_screen() {
 }
 
 // Helper to update specific feeder card
-void update_feeder_card(lv_obj_t * parent, int index, String nextTime) {
+void update_feeder_card(lv_obj_t * parent, int index, String nextTime, int duration) {
     lv_obj_t * card = lv_obj_get_child(parent, index);
     if (!card) return;
     
     // Clear existing content to refresh
     lv_obj_clean(card);
     
-    lv_obj_t * name = lv_label_create(card);
-    lv_label_set_text_fmt(name, "Feeder %d", index + 1);
+    // Container for Name and Duration (Left side)
+    lv_obj_t * left_cont = lv_obj_create(card);
+    lv_obj_set_size(left_cont, LV_PCT(55), LV_SIZE_CONTENT); // Shortened width (~ -10%)
+    lv_obj_set_style_bg_opa(left_cont, 0, 0);
+    lv_obj_set_style_border_width(left_cont, 0, 0);
+    lv_obj_set_flex_flow(left_cont, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_all(left_cont, 0, 0);
+    lv_obj_set_style_pad_gap(left_cont, 0, 0); // No gap
+
+    lv_obj_t * name = lv_label_create(left_cont);
+    lv_label_set_text_fmt(name, "Feeder %d (%ds)", index + 1, duration);
     lv_obj_set_style_text_font(name, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(name, lv_color_hex(0xFFFFFF), 0);
-    
+
+    // Time (Right side)
     lv_obj_t * time = lv_label_create(card);
     String txt = "Next: " + nextTime;
     lv_label_set_text(time, txt.c_str());
@@ -289,8 +302,8 @@ static void update_clock_cb(lv_timer_t * timer) {
   }
 
   // Update Time
-  char timeStr[6];
-  sprintf(timeStr, "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
+  char timeStr[9];
+  sprintf(timeStr, "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
   lv_label_set_text(time_label, timeStr);
   
   // Update Date
@@ -305,7 +318,7 @@ static void update_clock_cb(lv_timer_t * timer) {
       for(int i=0; i<3; i++) {
           FeederConfig f = portal.getFeeder(i+1);
           String next = calculateNextFeeding(f.startTime, f.interval, timeinfo);
-          update_feeder_card(feeders_cont, i, next);
+          update_feeder_card(feeders_cont, i, next, f.dispenseDuration);
       }
   }
 }
@@ -353,7 +366,7 @@ void loop() {
 }
 
 
-void Feeder_Dispense(uint8_t thisFeeder){
+void Feeder_Dispense(uint8_t thisFeeder, uint16_t thisFeeder_Duration){
     Serial.println("S"+String(thisFeeder)+": 90");
     delay(3000);
     Serial.println("S"+String(thisFeeder)+": 180");

@@ -14,6 +14,7 @@ struct FeederConfig {
     int id; // 1, 2, 3
     String startTime; // HH:MM
     String interval;  // HH:MM
+    int dispenseDuration; // Seconds
 };
 
 class Portal32 {
