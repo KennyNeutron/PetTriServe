@@ -17,7 +17,7 @@
   - Flash Size: "4MB (32Mb)"
   - JTAG Adapter: "Disabled"
   - Arduino Runs On: "Core 1"
-  - Partition Scheme: "Default 4MB with spiffs (1.2MB APP/1.5MB SPIFFS)"
+  - Partition Scheme: "Huge APP (3MB No OTA/1MB SPIFFS)"
   - PSRAM: "Disabled"
   - Upload Speed: "921600"
   - Zigbee Mode: "Disabled"
@@ -131,7 +131,7 @@ void create_home_screen() {
 
     // Time Label (Large)
     time_label = lv_label_create(home_cont);
-    lv_obj_set_style_text_font(time_label, &lv_font_montserrat_28, 0); // Reduced by ~20%
+    lv_obj_set_style_text_font(time_label, &lv_font_montserrat_34, 0); // Increased by ~20%
     lv_obj_set_style_text_color(time_label, lv_color_hex(0xFFFFFF), 0);
     lv_label_set_text(time_label, "00:00:00");
 
