@@ -153,7 +153,7 @@ const char INDEX_HTML[] PROGMEM = R"=====(
                 else { throw new Error("Save failed"); }
             } catch (e) { status.textContent = "Error saving settings."; status.className = "status-msg error"; btn.disabled = false; }
         }
-        async function checkStatus() {
+        async function checkStatus(updateInputs = false) {
             try {
                 const res = await fetch('/status');
                 const data = await res.json();
@@ -162,40 +162,42 @@ const char INDEX_HTML[] PROGMEM = R"=====(
                 conn.textContent = data.status; conn.className = 'badge ' + (data.status === 'connected' ? 'badge-green' : 'badge-gray');
                 const net = document.getElementById('net-status');
                 net.textContent = data.internet ? 'Access' : 'No Access'; net.className = 'badge ' + (data.internet ? 'badge-green' : 'badge-red');
-                if (data.device) document.getElementById('name').value = data.device;
+                if (data.device && updateInputs) document.getElementById('name').value = data.device;
                 
-                if (data.f1_start) document.getElementById('f1_start').value = data.f1_start;
-                if (data.f1_int) {
-                    const parts = data.f1_int.split(':');
-                    if(parts.length >= 2) {
-                        document.getElementById('f1_int_h').value = parseInt(parts[0]);
-                        document.getElementById('f1_int_m').value = parseInt(parts[1]);
+                if (updateInputs) {
+                    if (data.f1_start) document.getElementById('f1_start').value = data.f1_start;
+                    if (data.f1_int) {
+                        const parts = data.f1_int.split(':');
+                        if(parts.length >= 2) {
+                            document.getElementById('f1_int_h').value = parseInt(parts[0]);
+                            document.getElementById('f1_int_m').value = parseInt(parts[1]);
+                        }
                     }
-                }
-                if (data.f1_dur) document.getElementById('f1_dur').value = data.f1_dur;
-                
-                if (data.f2_start) document.getElementById('f2_start').value = data.f2_start;
-                if (data.f2_int) {
-                    const parts = data.f2_int.split(':');
-                    if(parts.length >= 2) {
-                        document.getElementById('f2_int_h').value = parseInt(parts[0]);
-                        document.getElementById('f2_int_m').value = parseInt(parts[1]);
+                    if (data.f1_dur) document.getElementById('f1_dur').value = data.f1_dur;
+                    
+                    if (data.f2_start) document.getElementById('f2_start').value = data.f2_start;
+                    if (data.f2_int) {
+                        const parts = data.f2_int.split(':');
+                        if(parts.length >= 2) {
+                            document.getElementById('f2_int_h').value = parseInt(parts[0]);
+                            document.getElementById('f2_int_m').value = parseInt(parts[1]);
+                        }
                     }
-                }
-                if (data.f2_dur) document.getElementById('f2_dur').value = data.f2_dur;
-                
-                if (data.f3_start) document.getElementById('f3_start').value = data.f3_start;
-                if (data.f3_int) {
-                    const parts = data.f3_int.split(':');
-                    if(parts.length >= 2) {
-                        document.getElementById('f3_int_h').value = parseInt(parts[0]);
-                        document.getElementById('f3_int_m').value = parseInt(parts[1]);
+                    if (data.f2_dur) document.getElementById('f2_dur').value = data.f2_dur;
+                    
+                    if (data.f3_start) document.getElementById('f3_start').value = data.f3_start;
+                    if (data.f3_int) {
+                        const parts = data.f3_int.split(':');
+                        if(parts.length >= 2) {
+                            document.getElementById('f3_int_h').value = parseInt(parts[0]);
+                            document.getElementById('f3_int_m').value = parseInt(parts[1]);
+                        }
                     }
+                    if (data.f3_dur) document.getElementById('f3_dur').value = data.f3_dur;
                 }
-                if (data.f3_dur) document.getElementById('f3_dur').value = data.f3_dur;
             } catch (e) { console.error("Status check failed", e); }
         }
-        window.onload = () => { scanWifi(); checkStatus(); setInterval(checkStatus, 5000); };
+        window.onload = () => { scanWifi(); checkStatus(true); setInterval(() => checkStatus(false), 5000); };
     </script>
 </body>
 </html>
@@ -282,7 +284,11 @@ FeederConfig Portal32::getFeeder(int id) {
 }
 
 void Portal32::loadSettings() {
-    preferences.begin("portal32", true);
+    bool success = preferences.begin("portal32", false); // Open in RW mode to ensure initialization
+    if (!success) {
+        Serial.println("[PORTAL32] Failed to open Preferences!");
+    }
+
     ssid = preferences.getString("ssid", "");
     password = preferences.getString("password", "");
     device_name = preferences.getString("device_name", "Portal32-Device");
@@ -304,17 +310,14 @@ void Portal32::loadSettings() {
     
     preferences.end();
 
-    Serial.printf("[PORTAL32] Loaded Settings:\n");
+    Serial.printf("[PORTAL32] Loaded Settings (Success: %s):\n", success ? "Yes" : "No");
     Serial.printf("  SSID: %s\n", ssid.c_str());
     Serial.printf("  F1 Start: %s, Int: %s, Dur: %d\n", feeders[0].startTime.c_str(), feeders[0].interval.c_str(), feeders[0].dispenseDuration);
     Serial.printf("  F2 Start: %s, Int: %s, Dur: %d\n", feeders[1].startTime.c_str(), feeders[1].interval.c_str(), feeders[1].dispenseDuration);
-    Serial.printf("  F3 Start: %s, Int: %s, Dur: %d\n", feeders[2].startTime.c_str(), feeders[2].interval.c_str(), feeders[2].dispenseDuration);}
+    Serial.printf("  F3 Start: %s, Int: %s, Dur: %d\n", feeders[2].startTime.c_str(), feeders[2].interval.c_str(), feeders[2].dispenseDuration);
+}
 
 void Portal32::saveSettings(String s, String p, String n) {
-    // This overload is kept for compatibility but main saving logic is in handleSave for specific fields
-    // or we can update this to take all params, but handleSave does it directly to prefs usually
-    // Let's just use it for basic wifi if needed, but better to do it in handleSave or separate method.
-    // For now, I will update this to just save what's passed, but handleSave will call preferences directly.
     preferences.begin("portal32", false);
     preferences.putString("ssid", s);
     preferences.putString("password", p);
@@ -418,6 +421,7 @@ void Portal32::handleSave() {
     preferences.putString("f3_int", f3_i);
     preferences.putInt("f3_dur", server.arg("f3_dur").toInt());
     preferences.end();
+    delay(100); // Give NVS a moment
 
     // Reload settings to update memory
     loadSettings();

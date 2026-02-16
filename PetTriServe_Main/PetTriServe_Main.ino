@@ -71,8 +71,8 @@ lv_obj_t * date_label;
 lv_obj_t * home_cont = NULL;
 lv_obj_t * status_label = NULL;
 
-String calculateNextFeeding(String startTime, String interval, struct tm &timeinfo) {
-    if (startTime.length() < 5) return "N/A";
+time_t calculateNextFeedingTime(String startTime, String interval, struct tm &timeinfo) {
+    if (startTime.length() < 5) return 0;
     
     int startH = startTime.substring(0, 2).toInt();
     int startM = startTime.substring(3, 5).toInt();
@@ -82,23 +82,21 @@ String calculateNextFeeding(String startTime, String interval, struct tm &timein
         intM = interval.substring(3, 5).toInt();
     }
     
-    // Create base time for today with start time
     struct tm feedingTime = timeinfo;
     feedingTime.tm_hour = startH;
     feedingTime.tm_min = startM;
     feedingTime.tm_sec = 0;
     
-    // Convert to time_t for easier comparison
     time_t now = mktime(&timeinfo);
     time_t feeding = mktime(&feedingTime);
     
-    // Sanity check
-    if (feeding == -1) return "Err";
+    if (feeding == -1) return 0;
+
+    long intervalSec = (intH * 3600) + (intM * 60);
 
     // If interval defines repeated feedings
-    if (intH > 0 || intM > 0) {
-        long intervalSec = (intH * 3600) + (intM * 60);
-        // Advance feeding time until it is in the future
+    if (intervalSec > 0) {
+        // Find the next feeding time in the future
         while (feeding <= now) {
             feeding += intervalSec;
         }
@@ -108,8 +106,11 @@ String calculateNextFeeding(String startTime, String interval, struct tm &timein
             feeding += 86400; // Add one day
         }
     }
-    
-    struct tm * nextFeed = localtime(&feeding);
+    return feeding;
+}
+
+String formatTime(time_t t) {
+    struct tm * nextFeed = localtime(&t);
     char buf[6];
     sprintf(buf, "%02d:%02d", nextFeed->tm_hour, nextFeed->tm_min);
     return String(buf);
@@ -315,12 +316,63 @@ static void update_clock_cb(lv_timer_t * timer) {
   lv_obj_t * feeders_cont = lv_obj_get_child(home_cont, 3); 
   
   if (feeders_cont) {
+      time_t now = mktime(&timeinfo);
       for(int i=0; i<3; i++) {
           FeederConfig f = portal.getFeeder(i+1);
-          String next = calculateNextFeeding(f.startTime, f.interval, timeinfo);
-          update_feeder_card(feeders_cont, i, next, f.dispenseDuration);
+          time_t nextT = calculateNextFeedingTime(f.startTime, f.interval, timeinfo);
+          String nextStr = (nextT > 0) ? formatTime(nextT) : "N/A";
+          
+          update_feeder_card(feeders_cont, i, nextStr, f.dispenseDuration);
+
+          // Check if it's time to feed!
+          // We check if current time matches a feeding schedule.
+          // Since calculateNextFeedingTime returns the *next* time (future), we need to check if we *just* passed a scheduled time.
+          // A better way: Recalculate based on start time and interval to see if 'now' is a feeding time.
+          
+          long intervalSec = 0;
+          if (f.interval.length() >= 5) {
+              intervalSec = (f.interval.substring(0, 2).toInt() * 3600) + (f.interval.substring(3, 5).toInt() * 60);
+          }
+          
+          bool isFeedingTime = false;
+          
+          // Parse start time to time_t for today
+          struct tm startTM = timeinfo;
+          startTM.tm_hour = f.startTime.substring(0, 2).toInt();
+          startTM.tm_min = f.startTime.substring(3, 5).toInt();
+          startTM.tm_sec = 0;
+          time_t startT = mktime(&startTM);
+          
+          if (intervalSec > 0) {
+              // Repeated feeding
+              // If now >= startT and (now - startT) % interval == 0
+              if (now >= startT) {
+                  long diff = now - startT;
+                  if (diff % intervalSec == 0 && timeinfo.tm_sec == 0) {
+                      isFeedingTime = true;
+                  }
+              }
+          } else {
+              // Once a day
+              if (now == startT) {
+                   isFeedingTime = true;
+              }
+          }
+          
+          if (isFeedingTime) {
+             Serial.printf("Feeding Time for Feeder %d!\n", i+1);
+             // Convert duration (seconds) to milliseconds for delay
+             Feeder_Dispense(i+1, f.dispenseDuration * 1000); 
+          }
       }
   }
+}
+
+// Feeder Dispense Function
+void Feeder_Dispense(uint8_t thisFeeder, uint16_t thisFeeder_Duration){
+    Serial.println("S"+String(thisFeeder)+": 90");
+    delay(thisFeeder_Duration);
+    Serial.println("S"+String(thisFeeder)+": 180");
 }
 
 void setup() {
@@ -366,8 +418,3 @@ void loop() {
 }
 
 
-void Feeder_Dispense(uint8_t thisFeeder, uint16_t thisFeeder_Duration){
-    Serial.println("S"+String(thisFeeder)+": 90");
-    delay(3000);
-    Serial.println("S"+String(thisFeeder)+": 180");
-}
