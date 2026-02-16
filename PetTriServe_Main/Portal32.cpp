@@ -33,6 +33,13 @@ const char INDEX_HTML[] PROGMEM = R"=====(
         .badge-green { background: #e8f5e9; color: #2e7d32; }
         .badge-gray { background: #f1f3f4; color: #5f6368; }
         .badge-red { background: #ffebee; color: #c62828; }
+        .password-container { position: relative; }
+        .password-toggle { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--secondary); display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; }
+        .password-toggle svg { width: 20px; height: 20px; }
+        .checkbox-container { display: flex; align-items: center; margin-bottom: 1rem; cursor: pointer; }
+        .checkbox-container input { width: auto; margin-right: 10px; }
+        .wifi-section { transition: opacity 0.3s; }
+        .wifi-disabled { opacity: 0.5; pointer-events: none; }
     </style>
 </head>
 <body>
@@ -43,14 +50,29 @@ const char INDEX_HTML[] PROGMEM = R"=====(
             <div class="info-row"><span class="info-label">Connection:</span><span id="conn-status" class="badge">Checking...</span></div>
             <div class="info-row"><span class="info-label">Internet:</span><span id="net-status" class="badge">Checking...</span></div>
         </div>
-        <div class="form-group">
-            <span class="scan-btn" onclick="scanWifi()">Refresh Scan</span>
-            <label for="ssid">WiFi Network (SSID)</label>
-            <select id="ssid_select" onchange="document.getElementById('ssid').value = this.value"><option value="">Scanning...</option></select>
-            <input type="hidden" id="ssid">
+        
+        <label class="checkbox-container">
+            <input type="checkbox" id="update_wifi" onchange="toggleWifiSection()"> Update WiFi Settings
+        </label>
+        
+        <div id="wifi-section" class="wifi-section wifi-disabled">
+            <div class="form-group">
+                <span class="scan-btn" onclick="scanWifi()">Refresh Scan</span>
+                <label for="ssid">WiFi Network (SSID)</label>
+                <select id="ssid_select" onchange="document.getElementById('ssid').value = this.value"><option value="">Scanning...</option></select>
+                <input type="hidden" id="ssid">
+            </div>
+            <div class="form-group">
+                <label for="pass">Password</label>
+                <div class="password-container">
+                    <input type="password" id="pass" placeholder="Enter WiFi Password">
+                    <span class="password-toggle" onclick="togglePassword()" id="pwd-toggle-btn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </span>
+                </div>
+            </div>
+            <div class="form-group"><label for="name">Device Name</label><input type="text" id="name" placeholder="Portal32-Device"></div>
         </div>
-        <div class="form-group"><label for="pass">Password</label><input type="password" id="pass" placeholder="Enter WiFi Password"></div>
-        <div class="form-group"><label for="name">Device Name</label><input type="text" id="name" placeholder="Portal32-Device"></div>
         
         <hr style="margin: 2rem 0; border: 0; border-top: 1px solid #d2d2d7;">
         <h3>Feeder Settings</h3>
@@ -94,11 +116,44 @@ const char INDEX_HTML[] PROGMEM = R"=====(
             <div class="form-group"><label>Duration (Seconds)</label><input type="number" id="f3_dur" min="1" max="60" value="5"></div>
         </div>
         
-        <button class="btn" id="saveBtn" onclick="saveConfig()">Save & Connect</button>
+        <button class="btn" id="saveBtn" onclick="saveConfig()">Save Settings</button>
         <div id="status" class="status-msg"></div>
     </div>
     <script>
+        const eyeOpen = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+        const eyeClosed = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07-2.3 2.3"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
+
+        function togglePassword() {
+            const pass = document.getElementById('pass');
+            const btn = document.getElementById('pwd-toggle-btn');
+            if (pass.type === 'password') {
+                pass.type = 'text';
+                btn.innerHTML = eyeClosed;
+            } else {
+                pass.type = 'password';
+                btn.innerHTML = eyeOpen;
+            }
+        }
+        function toggleWifiSection() {
+            const chk = document.getElementById('update_wifi');
+            const sec = document.getElementById('wifi-section');
+            if (chk.checked) {
+                sec.classList.remove('wifi-disabled');
+                // Enable inputs
+                document.getElementById('ssid_select').disabled = false;
+                document.getElementById('pass').disabled = false;
+                document.getElementById('name').disabled = false;
+            } else {
+                sec.classList.add('wifi-disabled');
+                // Disable inputs
+                document.getElementById('ssid_select').disabled = true;
+                document.getElementById('pass').disabled = true;
+                document.getElementById('name').disabled = true;
+            }
+        }
+        
         async function scanWifi() {
+            if (!document.getElementById('update_wifi').checked) return;
             const select = document.getElementById('ssid_select');
             select.innerHTML = '<option>Scanning...</option>';
             try {
@@ -114,6 +169,7 @@ const char INDEX_HTML[] PROGMEM = R"=====(
             } catch (e) { console.error("Scan failed", e); }
         }
         async function saveConfig() {
+            const updateWifi = document.getElementById('update_wifi').checked;
             const ssid = document.getElementById('ssid').value;
             const pass = document.getElementById('pass').value;
             const name = document.getElementById('name').value;
@@ -138,18 +194,30 @@ const char INDEX_HTML[] PROGMEM = R"=====(
 
             const status = document.getElementById('status');
             const btn = document.getElementById('saveBtn');
-            if (!ssid) { alert("Please select a WiFi network"); return; }
+            
+            if (updateWifi && !ssid) { alert("Please select a WiFi network"); return; }
+            
             status.style.display = 'block'; status.textContent = "Saving..."; status.className = "status-msg"; btn.disabled = true;
             try {
                 const formData = new URLSearchParams();
-                formData.append('ssid', ssid); formData.append('password', pass); formData.append('device_name', name);
+                if (updateWifi) {
+                    formData.append('update_wifi', 'true');
+                    formData.append('ssid', ssid); 
+                    formData.append('password', pass); 
+                    formData.append('device_name', name);
+                } else {
+                    formData.append('update_wifi', 'false');
+                }
                 
                 formData.append('f1_start', f1_start); formData.append('f1_int', f1_int); formData.append('f1_dur', f1_dur);
                 formData.append('f2_start', f2_start); formData.append('f2_int', f2_int); formData.append('f2_dur', f2_dur);
                 formData.append('f3_start', f3_start); formData.append('f3_int', f3_int); formData.append('f3_dur', f3_dur);
                 
                 const res = await fetch('/save', { method: 'POST', body: formData });
-                if (res.ok) { status.textContent = "Success! Rebooting ESP32..."; status.className = "status-msg success"; } 
+                if (res.ok) { 
+                    status.textContent = "Saved! " + (updateWifi ? "Rebooting ESP32..." : "Settings Updated."); 
+                    status.className = "status-msg success"; 
+                } 
                 else { throw new Error("Save failed"); }
             } catch (e) { status.textContent = "Error saving settings."; status.className = "status-msg error"; btn.disabled = false; }
         }
@@ -165,6 +233,8 @@ const char INDEX_HTML[] PROGMEM = R"=====(
                 if (data.device && updateInputs) document.getElementById('name').value = data.device;
                 
                 if (updateInputs) {
+                    toggleWifiSection(); // Initialize disabled state
+                    
                     if (data.f1_start) document.getElementById('f1_start').value = data.f1_start;
                     if (data.f1_int) {
                         const parts = data.f1_int.split(':');
@@ -378,36 +448,52 @@ void Portal32::handleScan() {
 }
 
 void Portal32::handleSave() {
-    if (!server.hasArg("ssid")) { server.send(400, "text/plain", "Missing Parameters"); return; }
-    String s = server.arg("ssid");
-    String p = server.arg("password");
-    String n = server.arg("device_name");
+    // Basic Feeder Settings are always required so we check for them or just proceed
+    // WiFi params are now optional based on update_wifi flag
     
-    // Feeder settings
     String f1_s = server.arg("f1_start");
     String f1_i = server.arg("f1_int");
     String f2_s = server.arg("f2_start");
     String f2_i = server.arg("f2_int");
     String f3_s = server.arg("f3_start");
     String f3_i = server.arg("f3_int");
+
+    bool updateWifi = server.arg("update_wifi") == "true";
+    String s, p, n;
     
+    if (updateWifi) {
+        if (!server.hasArg("ssid")) { server.send(400, "text/plain", "Missing SSID"); return; }
+        s = server.arg("ssid");
+        p = server.arg("password");
+        n = server.arg("device_name");
+    } else {
+        // Keep existing
+        s = ssid;
+        p = password; 
+        n = device_name;
+    }
+
     // Debugging
-    Serial.printf("[PORTAL32] Saving Config:\n");
-    Serial.printf("  SSID: %s\n", s.c_str());
-    Serial.printf("  Name: %s\n", n.c_str());
+    Serial.printf("[PORTAL32] Saving Config (Update WiFi: %s):\n", updateWifi ? "Yes" : "No");
+    if (updateWifi) {
+        Serial.printf("  SSID: %s\n", s.c_str());
+        Serial.printf("  Name: %s\n", n.c_str());
+    }
     Serial.printf("  F1 Start: %s, Int: %s, Dur: %d\n", f1_s.c_str(), f1_i.c_str(), server.arg("f1_dur").toInt());
     Serial.printf("  F2 Start: %s, Int: %s, Dur: %d\n", f2_s.c_str(), f2_i.c_str(), server.arg("f2_dur").toInt());
     Serial.printf("  F3 Start: %s, Int: %s, Dur: %d\n", f3_s.c_str(), f3_i.c_str(), server.arg("f3_dur").toInt());
 
     if (n.length() == 0) n = "Portal32-Device";
-    Serial.println("[PORTAL32] New configuration received. Saving...");
     
-    preferences.begin("portal32", false);
+    bool success = preferences.begin("portal32", false);
+    if (!success) Serial.println("[PORTAL32] Failed to open Prefs for saving");
     
     // Clear potentially corrupted keys by overwriting
-    preferences.putString("ssid", s);
-    preferences.putString("password", p);
-    preferences.putString("device_name", n);
+    if (updateWifi) {
+        preferences.putString("ssid", s);
+        preferences.putString("password", p);
+        preferences.putString("device_name", n);
+    }
     
     preferences.putString("f1_start", f1_s);
     preferences.putString("f1_int", f1_i);
@@ -427,7 +513,7 @@ void Portal32::handleSave() {
     loadSettings();
 
     server.send(200, "application/json", "{\"status\":\"ok\"}");
-    shouldConnect = true;
+    if (updateWifi) shouldConnect = true;
 }
 
 void Portal32::handleStatus() {
