@@ -27,15 +27,15 @@ void setup() {
 void loop() {
   if (Serial.available() > 0) {
     String command = Serial.readStringUntil('\n');
-    command.trim(); // Remove any leading/trailing whitespace
+    command.trim();  // Remove any leading/trailing whitespace
 
     if (command.length() > 0) {
       int separatorIndex = command.indexOf(':');
-      
+
       if (separatorIndex != -1) {
         String servoPart = command.substring(0, separatorIndex);
         String anglePart = command.substring(separatorIndex + 1);
-        
+
         servoPart.trim();
         anglePart.trim();
 
