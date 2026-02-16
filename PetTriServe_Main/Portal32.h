@@ -10,6 +10,12 @@ using namespace fs;
 #include <Preferences.h>
 #include <ESPmDNS.h>
 
+struct FeederConfig {
+    int id; // 1, 2, 3
+    String startTime; // HH:MM
+    String interval;  // HH:MM
+};
+
 class Portal32 {
 public:
     Portal32();
@@ -21,6 +27,7 @@ public:
     String getSSID();
     String getIP();
     String getDeviceName();
+    FeederConfig getFeeder(int id);
 
 private:
     WebServer server;
@@ -30,6 +37,7 @@ private:
     String ssid;
     String password;
     String device_name;
+    FeederConfig feeders[3]; // For Feeder 1, 2, 3
     
     bool isAPMode;
     bool isConnecting;

@@ -49,6 +49,28 @@ const char INDEX_HTML[] PROGMEM = R"=====(
         </div>
         <div class="form-group"><label for="pass">Password</label><input type="password" id="pass" placeholder="Enter WiFi Password"></div>
         <div class="form-group"><label for="name">Device Name</label><input type="text" id="name" placeholder="Portal32-Device"></div>
+        
+        <hr style="margin: 2rem 0; border: 0; border-top: 1px solid #d2d2d7;">
+        <h3>Feeder Settings</h3>
+        
+        <div class="info-card">
+            <strong>Feeder 1</strong>
+            <div class="form-group"><label>Start Time</label><input type="time" id="f1_start"></div>
+            <div class="form-group"><label>Interval (HH:MM)</label><input type="time" id="f1_int"></div>
+        </div>
+        
+        <div class="info-card">
+            <strong>Feeder 2</strong>
+            <div class="form-group"><label>Start Time</label><input type="time" id="f2_start"></div>
+            <div class="form-group"><label>Interval (HH:MM)</label><input type="time" id="f2_int"></div>
+        </div>
+
+        <div class="info-card">
+            <strong>Feeder 3</strong>
+            <div class="form-group"><label>Start Time</label><input type="time" id="f3_start"></div>
+            <div class="form-group"><label>Interval (HH:MM)</label><input type="time" id="f3_int"></div>
+        </div>
+        
         <button class="btn" id="saveBtn" onclick="saveConfig()">Save & Connect</button>
         <div id="status" class="status-msg"></div>
     </div>
@@ -72,6 +94,14 @@ const char INDEX_HTML[] PROGMEM = R"=====(
             const ssid = document.getElementById('ssid').value;
             const pass = document.getElementById('pass').value;
             const name = document.getElementById('name').value;
+            
+            const f1_start = document.getElementById('f1_start').value;
+            const f1_int = document.getElementById('f1_int').value;
+            const f2_start = document.getElementById('f2_start').value;
+            const f2_int = document.getElementById('f2_int').value;
+            const f3_start = document.getElementById('f3_start').value;
+            const f3_int = document.getElementById('f3_int').value;
+
             const status = document.getElementById('status');
             const btn = document.getElementById('saveBtn');
             if (!ssid) { alert("Please select a WiFi network"); return; }
@@ -79,6 +109,11 @@ const char INDEX_HTML[] PROGMEM = R"=====(
             try {
                 const formData = new URLSearchParams();
                 formData.append('ssid', ssid); formData.append('password', pass); formData.append('device_name', name);
+                
+                formData.append('f1_start', f1_start); formData.append('f1_int', f1_int);
+                formData.append('f2_start', f2_start); formData.append('f2_int', f2_int);
+                formData.append('f3_start', f3_start); formData.append('f3_int', f3_int);
+                
                 const res = await fetch('/save', { method: 'POST', body: formData });
                 if (res.ok) { status.textContent = "Success! Rebooting ESP32..."; status.className = "status-msg success"; } 
                 else { throw new Error("Save failed"); }
@@ -94,6 +129,13 @@ const char INDEX_HTML[] PROGMEM = R"=====(
                 const net = document.getElementById('net-status');
                 net.textContent = data.internet ? 'Access' : 'No Access'; net.className = 'badge ' + (data.internet ? 'badge-green' : 'badge-red');
                 if (data.device) document.getElementById('name').value = data.device;
+                
+                if (data.f1_start) document.getElementById('f1_start').value = data.f1_start;
+                if (data.f1_int) document.getElementById('f1_int').value = data.f1_int;
+                if (data.f2_start) document.getElementById('f2_start').value = data.f2_start;
+                if (data.f2_int) document.getElementById('f2_int').value = data.f2_int;
+                if (data.f3_start) document.getElementById('f3_start').value = data.f3_start;
+                if (data.f3_int) document.getElementById('f3_int').value = data.f3_int;
             } catch (e) { console.error("Status check failed", e); }
         }
         window.onload = () => { scanWifi(); checkStatus(); setInterval(checkStatus, 5000); };
@@ -177,15 +219,37 @@ String Portal32::getSSID() { return ssid; }
 String Portal32::getIP() { return WiFi.localIP().toString(); }
 String Portal32::getDeviceName() { return device_name; }
 
+FeederConfig Portal32::getFeeder(int id) {
+    if (id < 1 || id > 3) return {0, "", ""};
+    return feeders[id-1];
+}
+
 void Portal32::loadSettings() {
     preferences.begin("portal32", true);
     ssid = preferences.getString("ssid", "");
     password = preferences.getString("password", "");
     device_name = preferences.getString("device_name", "Portal32-Device");
+    
+    feeders[0].id = 1;
+    feeders[0].startTime = preferences.getString("f1_start", "08:00");
+    feeders[0].interval = preferences.getString("f1_int", "04:00");
+
+    feeders[1].id = 2;
+    feeders[1].startTime = preferences.getString("f2_start", "12:00");
+    feeders[1].interval = preferences.getString("f2_int", "04:00");
+
+    feeders[2].id = 3;
+    feeders[2].startTime = preferences.getString("f3_start", "18:00");
+    feeders[2].interval = preferences.getString("f3_int", "04:00");
+    
     preferences.end();
 }
 
 void Portal32::saveSettings(String s, String p, String n) {
+    // This overload is kept for compatibility but main saving logic is in handleSave for specific fields
+    // or we can update this to take all params, but handleSave does it directly to prefs usually
+    // Let's just use it for basic wifi if needed, but better to do it in handleSave or separate method.
+    // For now, I will update this to just save what's passed, but handleSave will call preferences directly.
     preferences.begin("portal32", false);
     preferences.putString("ssid", s);
     preferences.putString("password", p);
@@ -250,10 +314,34 @@ void Portal32::handleSave() {
     String s = server.arg("ssid");
     String p = server.arg("password");
     String n = server.arg("device_name");
+    
+    // Feeder settings
+    String f1_s = server.arg("f1_start");
+    String f1_i = server.arg("f1_int");
+    String f2_s = server.arg("f2_start");
+    String f2_i = server.arg("f2_int");
+    String f3_s = server.arg("f3_start");
+    String f3_i = server.arg("f3_int");
+
     if (n.length() == 0) n = "Portal32-Device";
     Serial.println("[PORTAL32] New configuration received. Saving...");
-    saveSettings(s, p, n);
-    ssid = s; password = p; device_name = n;
+    
+    preferences.begin("portal32", false);
+    preferences.putString("ssid", s);
+    preferences.putString("password", p);
+    preferences.putString("device_name", n);
+    
+    preferences.putString("f1_start", f1_s);
+    preferences.putString("f1_int", f1_i);
+    preferences.putString("f2_start", f2_s);
+    preferences.putString("f2_int", f2_i);
+    preferences.putString("f3_start", f3_s);
+    preferences.putString("f3_int", f3_i);
+    preferences.end();
+
+    // Reload settings to update memory
+    loadSettings();
+
     server.send(200, "application/json", "{\"status\":\"ok\"}");
     shouldConnect = true;
 }
@@ -265,7 +353,15 @@ void Portal32::handleStatus() {
     json += "\"current_ssid\":\"" + (WiFi.status() == WL_CONNECTED ? WiFi.SSID() : "") + "\",";
     json += "\"internet\":" + String(internet ? "true" : "false") + ",";
     json += "\"ip\":\"" + WiFi.localIP().toString() + "\",";
-    json += "\"device\":\"" + device_name + "\"";
+    json += "\"device\":\"" + device_name + "\",";
+    
+    json += "\"f1_start\":\"" + feeders[0].startTime + "\",";
+    json += "\"f1_int\":\"" + feeders[0].interval + "\",";
+    json += "\"f2_start\":\"" + feeders[1].startTime + "\",";
+    json += "\"f2_int\":\"" + feeders[1].interval + "\",";
+    json += "\"f3_start\":\"" + feeders[2].startTime + "\",";
+    json += "\"f3_int\":\"" + feeders[2].interval + "\"";
+    
     json += "}";
     server.send(200, "application/json", json);
 }

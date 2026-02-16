@@ -66,7 +66,154 @@ int x, y, z;
 
 #define DRAW_BUF_SIZE (SCREEN_WIDTH * SCREEN_HEIGHT / 6 * (LV_COLOR_DEPTH / 8))
 uint32_t draw_buf[DRAW_BUF_SIZE / 4];
-lv_obj_t * time_label; 
+lv_obj_t * time_label;
+lv_obj_t * date_label;
+lv_obj_t * home_cont = NULL;
+lv_obj_t * status_label = NULL;
+
+String calculateNextFeeding(String startTime, String interval, struct tm &timeinfo) {
+    if (startTime.length() < 5) return "N/A";
+    
+    int startH = startTime.substring(0, 2).toInt();
+    int startM = startTime.substring(3, 5).toInt();
+    int intH = 0, intM = 0;
+    if (interval.length() >= 5) {
+        intH = interval.substring(0, 2).toInt();
+        intM = interval.substring(3, 5).toInt();
+    }
+    
+    // Create base time for today with start time
+    struct tm feedingTime = timeinfo;
+    feedingTime.tm_hour = startH;
+    feedingTime.tm_min = startM;
+    feedingTime.tm_sec = 0;
+    
+    // Convert to time_t for easier comparison
+    time_t now = mktime(&timeinfo);
+    time_t feeding = mktime(&feedingTime);
+    
+    // Sanity check
+    if (feeding == -1) return "Err";
+
+    // If interval defines repeated feedings
+    if (intH > 0 || intM > 0) {
+        long intervalSec = (intH * 3600) + (intM * 60);
+        // Advance feeding time until it is in the future
+        while (feeding <= now) {
+            feeding += intervalSec;
+        }
+    } else {
+        // Just once a day
+        if (feeding <= now) {
+            feeding += 86400; // Add one day
+        }
+    }
+    
+    struct tm * nextFeed = localtime(&feeding);
+    char buf[6];
+    sprintf(buf, "%02d:%02d", nextFeed->tm_hour, nextFeed->tm_min);
+    return String(buf);
+}
+
+void create_home_screen() {
+    if (home_cont != NULL) return; // Already created
+
+    lv_obj_clean(lv_screen_active());
+    home_cont = lv_obj_create(lv_screen_active());
+    lv_obj_set_size(home_cont, LV_PCT(100), LV_PCT(100));
+    lv_obj_set_style_bg_color(home_cont, lv_color_hex(0x000000), 0);
+    lv_obj_set_style_border_width(home_cont, 0, 0);
+    lv_obj_set_flex_flow(home_cont, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(home_cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_all(home_cont, 5, 0);       // Reduced padding
+    lv_obj_set_style_pad_row(home_cont, 2, 0);       // Reduced gap between rows
+
+    // Time Label (Large)
+    time_label = lv_label_create(home_cont);
+    lv_obj_set_style_text_font(time_label, &lv_font_montserrat_34, 0);
+    lv_obj_set_style_text_color(time_label, lv_color_hex(0xFFFFFF), 0);
+    lv_label_set_text(time_label, "00:00");
+
+    // Date Label
+    date_label = lv_label_create(home_cont);
+    lv_obj_set_style_text_font(date_label, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_color(date_label, lv_color_hex(0xCCCCCC), 0);
+    lv_label_set_text(date_label, "Loading...");
+
+    // Separator
+    lv_obj_t * line = lv_line_create(home_cont);
+    static lv_point_precise_t line_points[] = { {0, 0}, {200, 0} };
+    lv_line_set_points(line, line_points, 2);
+    lv_obj_set_style_line_width(line, 2, 0);
+    lv_obj_set_style_line_color(line, lv_color_hex(0x444444), 0);
+    lv_obj_set_style_margin_ver(line, 5, 0);         // Reduced margin
+
+    // Feeder Container
+    lv_obj_t * feeders_cont = lv_obj_create(home_cont);
+    lv_obj_set_size(feeders_cont, LV_PCT(100), LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(feeders_cont, 0, 0);
+    lv_obj_set_style_border_width(feeders_cont, 0, 0);
+    lv_obj_set_flex_flow(feeders_cont, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_all(feeders_cont, 0, 0);    
+    lv_obj_set_style_pad_row(feeders_cont, 4, 0);    
+
+    // Feeder Colors: Red, Green, Blue
+    uint32_t colors[] = { 0xCC3333, 0x33CC33, 0x3333CC }; 
+
+    for(int i=0; i<3; i++) {
+        lv_obj_t * f_card = lv_obj_create(feeders_cont);
+        lv_obj_set_size(f_card, LV_PCT(100), LV_SIZE_CONTENT);
+        lv_obj_set_style_bg_color(f_card, lv_color_hex(colors[i]), 0);
+        lv_obj_set_style_bg_opa(f_card, 150, 0); // Slight transparency
+        lv_obj_set_style_pad_all(f_card, 5, 0);
+        lv_obj_set_style_radius(f_card, 5, 0);
+        lv_obj_set_flex_flow(f_card, LV_FLEX_FLOW_ROW);
+        lv_obj_set_flex_align(f_card, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+        lv_obj_set_style_border_width(f_card, 0, 0);
+    }
+
+    // Network Info Container
+    lv_obj_t * net_info = lv_obj_create(home_cont);
+    lv_obj_set_size(net_info, LV_PCT(100), LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(net_info, 0, 0);
+    lv_obj_set_style_border_width(net_info, 0, 0);
+    lv_obj_set_flex_flow(net_info, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(net_info, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_all(net_info, 2, 0);
+    
+    // SSID Label
+    lv_obj_t * ssid_lbl = lv_label_create(net_info);
+    lv_label_set_text_fmt(ssid_lbl, "WiFi: %s", portal.getSSID().c_str());
+    lv_obj_set_style_text_font(ssid_lbl, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_color(ssid_lbl, lv_color_hex(0x888888), 0);
+
+    // IP Label
+    lv_obj_t * ip_lbl = lv_label_create(net_info);
+    lv_label_set_text_fmt(ip_lbl, "IP: %s", portal.getIP().c_str());
+    lv_obj_set_style_text_font(ip_lbl, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_color(ip_lbl, lv_color_hex(0x888888), 0);
+}
+
+// Helper to update specific feeder card
+void update_feeder_card(lv_obj_t * parent, int index, String nextTime) {
+    lv_obj_t * card = lv_obj_get_child(parent, index);
+    if (!card) return;
+    
+    // Clear existing content to refresh
+    lv_obj_clean(card);
+    
+    lv_obj_t * name = lv_label_create(card);
+    lv_label_set_text_fmt(name, "Feeder %d", index + 1);
+    lv_obj_set_style_text_font(name, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(name, lv_color_hex(0xFFFFFF), 0);
+    
+    lv_obj_t * time = lv_label_create(card);
+    String txt = "Next: " + nextTime;
+    lv_label_set_text(time, txt.c_str());
+    lv_obj_set_style_text_font(time, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_color(time, lv_color_hex(0xFFFFFF), 0); 
+    lv_obj_set_style_text_decor(time, LV_TEXT_DECOR_NONE, 0);
+}
 
 // Log callback for LVGL
 void log_print(lv_log_level_t level, const char * buf) {
@@ -95,40 +242,72 @@ void touchscreen_read(lv_indev_t * indev, lv_indev_data_t * data) {
 }
 
 // Timer callback to update the clock
+// Timer callback to update the clock
 static void update_clock_cb(lv_timer_t * timer) {
   struct tm timeinfo;
-  if(!getLocalTime(&timeinfo)){
-    // Check connection status
-    if (portal.isWifiConnecting()) {
-         String msg = "Connecting to:\n" + portal.getSSID();
-         lv_label_set_text(time_label, msg.c_str());
-    } else if (portal.isAPModeActive()) {
-         lv_label_set_text(time_label, "Setup WiFi: \nConnect to 'Portal32'");
-    } else if (portal.isConnected()) {
-         lv_label_set_text(time_label, "Syncing Time...");
-    } else {
-         lv_label_set_text(time_label, "Not Connected");
+  bool timeSynced = getLocalTime(&timeinfo);
+
+  if(!timeSynced){
+    // Not synced yet, show status
+    if (home_cont != NULL) {
+         lv_obj_del(home_cont);
+         home_cont = NULL;
+         status_label = NULL;
+    }
+    
+    if (status_label == NULL && home_cont == NULL) {
+        lv_obj_clean(lv_screen_active());
+        status_label = lv_label_create(lv_screen_active());
+        lv_obj_set_style_text_font(status_label, &lv_font_montserrat_20, 0); 
+        lv_obj_set_style_text_align(status_label, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align(status_label, LV_ALIGN_CENTER, 0, 0);
+    }
+    
+    if (status_label != NULL) {
+        if (portal.isWifiConnecting()) {
+             String msg = "Connecting to:\n" + portal.getSSID();
+             lv_label_set_text(status_label, msg.c_str());
+        } else if (portal.isAPModeActive()) {
+             lv_label_set_text(status_label, "Setup WiFi: \nConnect to 'Portal32'");
+        } else if (portal.isConnected()) {
+             lv_label_set_text(status_label, "Syncing Time...");
+        } else {
+             lv_label_set_text(status_label, "Not Connected");
+        }
     }
     return;
   }
-  char timeString[9];
-  // Format as HH:MM:SS
-  strftime(timeString, 9, "%H:%M:%S", &timeinfo);
-  lv_label_set_text(time_label, timeString);
-  
-  lv_obj_align(time_label, LV_ALIGN_CENTER, 0, 0); 
-}
 
-void lv_create_main_gui(void) {
-  // Time Label
-  time_label = lv_label_create(lv_screen_active());
-  lv_label_set_text(time_label, "Starting...");
+  // Time is synced!
+  if (status_label != NULL) {
+       lv_obj_del(status_label);
+       status_label = NULL;
+  }
   
-  lv_obj_set_style_text_align(time_label, LV_TEXT_ALIGN_CENTER, 0);
-  lv_obj_align(time_label, LV_ALIGN_CENTER, 0, 0);
+  if (home_cont == NULL) {
+      create_home_screen();
+  }
 
-  // Create a timer to update the label every 1000ms (1 second)
-  lv_timer_create(update_clock_cb, 1000, NULL);
+  // Update Time
+  char timeStr[6];
+  sprintf(timeStr, "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
+  lv_label_set_text(time_label, timeStr);
+  
+  // Update Date
+  char dateStr[20];
+  strftime(dateStr, sizeof(dateStr), "%a, %b %d", &timeinfo);
+  lv_label_set_text(date_label, dateStr);
+
+  // Update Feeders
+  lv_obj_t * feeders_cont = lv_obj_get_child(home_cont, 3); 
+  
+  if (feeders_cont) {
+      for(int i=0; i<3; i++) {
+          FeederConfig f = portal.getFeeder(i+1);
+          String next = calculateNextFeeding(f.startTime, f.interval, timeinfo);
+          update_feeder_card(feeders_cont, i, next);
+      }
+  }
 }
 
 void setup() {
@@ -159,8 +338,8 @@ void setup() {
   // Initialize Portal32
   portal.begin();
   
-  // Create GUI
-  lv_create_main_gui();
+  // Start Query Timer
+  lv_timer_create(update_clock_cb, 1000, NULL);
 
   // Configure NTP
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
@@ -171,4 +350,11 @@ void loop() {
   lv_task_handler();  // let the GUI do its work
   lv_tick_inc(5);     // tell LVGL how much time has passed
   delay(5);           // let this time pass
+}
+
+
+void Feeder_Dispense(uint8_t thisFeeder){
+    Serial.println("S"+String(thisFeeder)+": 90");
+    delay(3000);
+    Serial.println("S"+String(thisFeeder)+": 180");
 }
