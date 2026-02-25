@@ -16,9 +16,9 @@ void setup() {
   myServo3.attach(servoPin3);  // attach servo to pin 9
 
   // Initial position
-  myServo1.write(90);
-  myServo2.write(90);
-  myServo3.write(90);
+  myServo1.write(120);
+  myServo2.write(120);
+  myServo3.write(120);
 
   Serial.println("Servo Controller Ready");
   Serial.println("Enter command (e.g., S1: 120)");
