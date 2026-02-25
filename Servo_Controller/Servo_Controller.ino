@@ -10,15 +10,18 @@ int servoPin3 = 9;  // pin connected to servo signal wire
 
 void setup() {
   Serial.begin(115200);  // Initialize serial communication
+  // delay(10000);//
 
   myServo1.attach(servoPin1);  // attach servo to pin 5
   myServo2.attach(servoPin2);  // attach servo to pin 6
   myServo3.attach(servoPin3);  // attach servo to pin 9
 
   // Initial position
-  myServo1.write(90);
-  myServo2.write(90);
-  myServo3.write(90);
+  myServo1.write(180);
+  myServo2.write(180);
+  myServo3.write(180);
+
+  delay(10000);
 
   Serial.println("Servo Controller Ready");
   Serial.println("Enter command (e.g., S1: 120)");
