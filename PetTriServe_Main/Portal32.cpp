@@ -152,6 +152,7 @@ const char INDEX_HTML[] PROGMEM = R"=====(
             }
         }
         
+        let scanRetries = 0;
         async function scanWifi() {
             if (!document.getElementById('update_wifi').checked) return;
             const select = document.getElementById('ssid_select');
@@ -159,6 +160,12 @@ const char INDEX_HTML[] PROGMEM = R"=====(
             try {
                 const res = await fetch('/scan');
                 const networks = await res.json();
+                if (networks.length === 0 && scanRetries < 5) {
+                    scanRetries++;
+                    setTimeout(scanWifi, 2000);
+                    return;
+                }
+                scanRetries = 0;
                 select.innerHTML = '<option value="">Select a network</option>';
                 networks.forEach(net => {
                     const opt = document.createElement('option');
@@ -433,7 +440,25 @@ void Portal32::handleRoot() {
 }
 
 void Portal32::handleScan() {
-    int n = WiFi.scanNetworks();
+    // Ensure we are in AP+STA mode so AP stays responsive during scan
+    if (WiFi.getMode() == WIFI_STA) {
+        WiFi.mode(WIFI_AP_STA);
+    }
+
+    int n = WiFi.scanComplete();
+    if (n == WIFI_SCAN_FAILED) {
+        // No scan running or previous scan failed — start a new async scan
+        WiFi.scanNetworks(true); // async = true
+        server.send(200, "application/json", "[]");
+        return;
+    }
+    if (n == WIFI_SCAN_RUNNING) {
+        // Scan is still in progress
+        server.send(200, "application/json", "[]");
+        return;
+    }
+
+    // Scan complete — build JSON results
     String json = "[";
     for (int i = 0; i < n; ++i) {
         json += "{";
@@ -444,6 +469,7 @@ void Portal32::handleScan() {
         if (i < n - 1) json += ",";
     }
     json += "]";
+    WiFi.scanDelete(); // Free memory from scan results
     server.send(200, "application/json", json);
 }
 

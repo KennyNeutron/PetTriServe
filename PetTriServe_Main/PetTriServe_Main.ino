@@ -256,7 +256,6 @@ void touchscreen_read(lv_indev_t * indev, lv_indev_data_t * data) {
 }
 
 // Timer callback to update the clock
-// Timer callback to update the clock
 static void update_clock_cb(lv_timer_t * timer) {
   struct tm timeinfo;
   bool timeSynced = getLocalTime(&timeinfo);
